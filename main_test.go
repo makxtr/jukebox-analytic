@@ -17,6 +17,8 @@ type mockRepository struct {
 	updatePriceCalled      bool
 	updatePriceArgID       int
 	updatePriceArgNewPrice float64
+
+	mockTopTracks []TopTrackStat
 }
 
 func (m *mockRepository) GetTrackByID(id int) (*Track, error) {
@@ -40,13 +42,21 @@ func (m *mockRepository) UpdateTrackPrice(id int, newPrice float64) error {
 	return nil
 }
 
-func (m *mockRepository) CreateLog(log PlaybackLog) {
+func (m *mockRepository) CreateLog(log PlaybackLog) error {
 	m.createLogCalled = true
 	m.logs = append(m.logs, log)
+	return nil
 }
 
 func (m *mockRepository) GetAllLogs() []PlaybackLog {
 	return m.logs
+}
+
+func (m *mockRepository) GetTopTracks(limit int) ([]TopTrackStat, error) {
+	if len(m.mockTopTracks) > limit {
+		return m.mockTopTracks[:limit], nil
+	}
+	return m.mockTopTracks, nil
 }
 
 func TestHandleLogPlayback(t *testing.T) {
@@ -133,15 +143,13 @@ func TestHandleUpdatePrice(t *testing.T) {
 }
 
 func TestHandleGetTopTracks(t *testing.T) {
+	expected := []TopTrackStat{
+		{Title: "Song A", Count: 10},
+		{Title: "Song B", Count: 5},
+	}
+
 	mockRepo := &mockRepository{
-		tracks: map[int]*Track{
-			1: {ID: 1, Title: "Song A"},
-			2: {ID: 2, Title: "Song B"},
-		},
-		logs: []PlaybackLog{
-			{TrackID: 1}, {TrackID: 1}, // Song A: 2
-			{TrackID: 2}, // Song B: 1
-		},
+		mockTopTracks: expected,
 	}
 	handler := NewAnalyticsHandler(mockRepo)
 
@@ -157,11 +165,6 @@ func TestHandleGetTopTracks(t *testing.T) {
 
 	var result []TopTrackStat
 	json.NewDecoder(resp.Body).Decode(&result)
-
-	expected := []TopTrackStat{
-		{Title: "Song A", Count: 2},
-		{Title: "Song B", Count: 1},
-	}
 
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("Result mismatch.\nExpected: %+v\nGot:      %+v", expected, result)

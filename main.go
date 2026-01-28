@@ -2,13 +2,19 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 )
 
 const serverAddr = ":8080"
+const db = "./jukebox.db"
 
 func main() {
-	repo := NewInMemoryRepository()
+	repo, err := NewSQLiteRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+
 	handler := NewAnalyticsHandler(repo)
 
 	mux := http.NewServeMux()

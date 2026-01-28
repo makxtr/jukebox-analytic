@@ -31,12 +31,18 @@ type PlaybackLog struct {
 	AmountPaid float64
 }
 
+type TopTrackStat struct {
+	Title string `json:"title"`
+	Count int    `json:"count"`
+}
+
 type TrackRepository interface {
 	GetTrackByID(id int) (*Track, error)
 	UpdateTrackPrice(id int, newPrice float64) error
 }
 
 type PlaybackLogRepository interface {
-	CreateLog(log PlaybackLog)
+	CreateLog(log PlaybackLog) error
 	GetAllLogs() []PlaybackLog
+	GetTopTracks(limit int) ([]TopTrackStat, error)
 }

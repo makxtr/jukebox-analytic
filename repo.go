@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 type IRepository interface {
 	TrackRepository
@@ -29,12 +32,37 @@ func (r *inMemoryRepository) UpdateTrackPrice(id int, newPrice float64) error {
 	return nil
 }
 
-func (r *inMemoryRepository) CreateLog(log PlaybackLog) {
+func (r *inMemoryRepository) CreateLog(log PlaybackLog) error {
 	r.logs = append(r.logs, log)
+	return nil
 }
 
 func (r *inMemoryRepository) GetAllLogs() []PlaybackLog {
 	return r.logs
+}
+
+func (r *inMemoryRepository) GetTopTracks(limit int) ([]TopTrackStat, error) {
+	counts := make(map[int]int)
+	for _, log := range r.logs {
+		counts[log.TrackID]++
+	}
+
+	var stats []TopTrackStat
+	for trackID, count := range counts {
+		track, err := r.GetTrackByID(trackID)
+		if err == nil {
+			stats = append(stats, TopTrackStat{Title: track.Title, Count: count})
+		}
+	}
+
+	sort.Slice(stats, func(i, j int) bool {
+		return stats[i].Count > stats[j].Count
+	})
+
+	if len(stats) > limit {
+		stats = stats[:limit]
+	}
+	return stats, nil
 }
 
 func NewInMemoryRepository() IRepository {

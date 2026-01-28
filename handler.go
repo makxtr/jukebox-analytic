@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 )
@@ -25,11 +24,6 @@ type UpdatePriceRequest struct {
 	NewPrice float64 `json:"new_price"`
 }
 
-type TopTrackStat struct {
-	Title string `json:"title"`
-	Count int    `json:"count"`
-}
-
 func (h *AnalyticsHandler) HandleLogPlayback(w http.ResponseWriter, r *http.Request) {
 	var req CreateLogRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -48,7 +42,11 @@ func (h *AnalyticsHandler) HandleLogPlayback(w http.ResponseWriter, r *http.Requ
 		AmountPaid: req.AmountPaid,
 		PlayedAt:   time.Now(),
 	}
-	h.repo.CreateLog(log)
+
+	if err := h.repo.CreateLog(log); err != nil {
+		http.Error(w, "Failed to create log", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -82,28 +80,10 @@ func (h *AnalyticsHandler) HandleUpdatePrice(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *AnalyticsHandler) HandleGetTopTracks(w http.ResponseWriter, r *http.Request) {
-	logs := h.repo.GetAllLogs()
-	counts := make(map[int]int)
-	for _, log := range logs {
-		counts[log.TrackID]++
-	}
-
-	var stats []TopTrackStat
-	for trackID, count := range counts {
-		track, err := h.repo.GetTrackByID(trackID)
-		if err == nil {
-			stats = append(stats, TopTrackStat{Title: track.Title, Count: count})
-		}
-	}
-
-	sort.Slice(stats, func(i, j int) bool {
-		return stats[i].Count > stats[j].Count
-	})
-
-	// TOP-3
-	top3 := stats
-	if len(top3) > 3 {
-		top3 = top3[:3]
+	top3, err := h.repo.GetTopTracks(3)
+	if err != nil {
+		http.Error(w, "Failed to get stats", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
