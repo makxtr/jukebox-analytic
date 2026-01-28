@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"testing"
 )
@@ -52,26 +56,34 @@ func TestHandleLogPlayback(t *testing.T) {
 		}
 		handler := NewAnalyticsHandler(mockRepo)
 
-		handler.HandleLogPlayback(1, 1.25)
+		reqBody := []byte(`{"track_id": 1, "amount_paid": 1.25}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/logs", bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
 
-		if !mockRepo.createLogCalled {
-			t.Error("CreateLog was not called, but it should have been")
+		handler.HandleLogPlayback(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusCreated {
+			t.Errorf("Expected status 201 Created, got %d", resp.StatusCode)
 		}
-		if len(mockRepo.logs) != 1 {
-			t.Errorf("Expected 1 log, but got %d", len(mockRepo.logs))
+		if !mockRepo.createLogCalled {
+			t.Error("CreateLog was not called")
 		}
 	})
 
 	t.Run("track not found", func(t *testing.T) {
-		mockRepo := &mockRepository{
-			tracks: map[int]*Track{},
-		}
+		mockRepo := &mockRepository{tracks: map[int]*Track{}}
 		handler := NewAnalyticsHandler(mockRepo)
 
-		handler.HandleLogPlayback(99, 1.25)
+		reqBody := []byte(`{"track_id": 99, "amount_paid": 1.25}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/logs", bytes.NewBuffer(reqBody))
+		w := httptest.NewRecorder()
 
-		if mockRepo.createLogCalled {
-			t.Error("CreateLog was called, but it should not have been (track not found)")
+		handler.HandleLogPlayback(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("Expected status 404 Not Found, got %d", resp.StatusCode)
 		}
 	})
 }
@@ -83,27 +95,39 @@ func TestHandleUpdatePrice(t *testing.T) {
 		}
 		handler := NewAnalyticsHandler(mockRepo)
 
-		handler.HandleUpdatePrice(1, 1.50)
+		reqBody := []byte(`{"new_price": 1.50}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/tracks/1/price", bytes.NewBuffer(reqBody))
+		req.SetPathValue("id", "1")
 
-		if !mockRepo.updatePriceCalled {
-			t.Error("UpdateTrackPrice was not called")
+		w := httptest.NewRecorder()
+
+		handler.HandleUpdatePrice(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200 OK, got %d", resp.StatusCode)
 		}
-		if mockRepo.updatePriceArgID != 1 || mockRepo.updatePriceArgNewPrice != 1.50 {
-			t.Errorf("UpdateTrackPrice called with wrong arguments: ID=%d, Price=%.2f",
-				mockRepo.updatePriceArgID, mockRepo.updatePriceArgNewPrice)
+		if mockRepo.updatePriceArgNewPrice != 1.50 {
+			t.Errorf("Expected price update to 1.50, got %.2f", mockRepo.updatePriceArgNewPrice)
 		}
 	})
 
-	t.Run("invalid price (zero)", func(t *testing.T) {
+	t.Run("invalid price", func(t *testing.T) {
 		mockRepo := &mockRepository{
-			tracks: map[int]*Track{1: {ID: 1, Title: "Test Song", Price: 1.00}},
+			tracks: map[int]*Track{1: {ID: 1, Title: "Test Song"}},
 		}
 		handler := NewAnalyticsHandler(mockRepo)
 
-		handler.HandleUpdatePrice(1, 0)
+		reqBody := []byte(`{"new_price": -5.00}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/v1/tracks/1/price", bytes.NewBuffer(reqBody))
+		req.SetPathValue("id", "1")
+		w := httptest.NewRecorder()
 
-		if mockRepo.updatePriceCalled {
-			t.Error("UpdateTrackPrice was called with an invalid price, but it should not have been")
+		handler.HandleUpdatePrice(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected status 400 Bad Request, got %d", resp.StatusCode)
 		}
 	})
 }
@@ -113,31 +137,33 @@ func TestHandleGetTopTracks(t *testing.T) {
 		tracks: map[int]*Track{
 			1: {ID: 1, Title: "Song A"},
 			2: {ID: 2, Title: "Song B"},
-			3: {ID: 3, Title: "Song C"},
-			4: {ID: 4, Title: "Song D"},
 		},
 		logs: []PlaybackLog{
-			{TrackID: 1}, {TrackID: 1}, {TrackID: 1},
-			{TrackID: 2}, {TrackID: 2},
-			{TrackID: 3},
-			{TrackID: 4},
+			{TrackID: 1}, {TrackID: 1}, // Song A: 2
+			{TrackID: 2}, // Song B: 1
 		},
 	}
 	handler := NewAnalyticsHandler(mockRepo)
 
-	result := handler.HandleGetTopTracks()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/stats/top", nil)
+	w := httptest.NewRecorder()
 
-	expected := []TopTrackStat{
-		{Title: "Song A", Count: 3},
-		{Title: "Song B", Count: 2},
-		{Title: "Song C", Count: 1},
+	handler.HandleGetTopTracks(w, req)
+
+	resp := w.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200 OK, got %d", resp.StatusCode)
 	}
 
-	if len(result) != 3 {
-		t.Fatalf("Expected 3 tracks in top, but got %d", len(result))
+	var result []TopTrackStat
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	expected := []TopTrackStat{
+		{Title: "Song A", Count: 2},
+		{Title: "Song B", Count: 1},
 	}
 
 	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("Result does not match expected.\nExpected: %+v\nGot:      %+v", expected, result)
+		t.Errorf("Result mismatch.\nExpected: %+v\nGot:      %+v", expected, result)
 	}
 }

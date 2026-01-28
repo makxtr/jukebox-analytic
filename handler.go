@@ -1,8 +1,10 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"net/http"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -14,48 +16,72 @@ func NewAnalyticsHandler(repo IRepository) *AnalyticsHandler {
 	return &AnalyticsHandler{repo: repo}
 }
 
-// [POST] /api/v1/logs
-func (h *AnalyticsHandler) HandleLogPlayback(trackID int, amountPaid float64) {
-	_, err := h.repo.GetTrackByID(trackID)
+type CreateLogRequest struct {
+	TrackID    int     `json:"track_id"`
+	AmountPaid float64 `json:"amount_paid"`
+}
+
+type UpdatePriceRequest struct {
+	NewPrice float64 `json:"new_price"`
+}
+
+type TopTrackStat struct {
+	Title string `json:"title"`
+	Count int    `json:"count"`
+}
+
+func (h *AnalyticsHandler) HandleLogPlayback(w http.ResponseWriter, r *http.Request) {
+	var req CreateLogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.repo.GetTrackByID(req.TrackID)
 	if err != nil {
-		fmt.Printf("Error: %v (HTTP 404)\n", err)
+		http.Error(w, "Track not found", http.StatusNotFound)
 		return
 	}
 
 	log := PlaybackLog{
-		TrackID:    trackID,
-		AmountPaid: amountPaid,
+		TrackID:    req.TrackID,
+		AmountPaid: req.AmountPaid,
 		PlayedAt:   time.Now(),
 	}
 	h.repo.CreateLog(log)
 
-	fmt.Printf("Successfully logged playback for track %d\n", trackID)
+	w.WriteHeader(http.StatusCreated)
 }
 
-// [PATCH] /api/v1/tracks/{id}/price
-func (h *AnalyticsHandler) HandleUpdatePrice(trackID int, newPrice float64) {
-	if newPrice <= 0 {
-		fmt.Printf("Error: price must be greater than 0 (HTTP 400)\n")
-		return
-	}
-
-	err := h.repo.UpdateTrackPrice(trackID, newPrice)
+func (h *AnalyticsHandler) HandleUpdatePrice(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	trackID, err := strconv.Atoi(idStr)
 	if err != nil {
-		fmt.Printf("Error: %v (HTTP 404)\n", err)
+		http.Error(w, "Invalid track ID", http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf("Price for track %d updated successfully\n", trackID)
+	var req UpdatePriceRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.NewPrice <= 0 {
+		http.Error(w, "Price must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	err = h.repo.UpdateTrackPrice(trackID, req.NewPrice)
+	if err != nil {
+		http.Error(w, "Track not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
-// TopTrackStat
-type TopTrackStat struct {
-	Title string
-	Count int
-}
-
-// [GET] /api/v1/stats/top
-func (h *AnalyticsHandler) HandleGetTopTracks() []TopTrackStat {
+func (h *AnalyticsHandler) HandleGetTopTracks(w http.ResponseWriter, r *http.Request) {
 	logs := h.repo.GetAllLogs()
 	counts := make(map[int]int)
 	for _, log := range logs {
@@ -80,5 +106,6 @@ func (h *AnalyticsHandler) HandleGetTopTracks() []TopTrackStat {
 		top3 = top3[:3]
 	}
 
-	return top3
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(top3)
 }

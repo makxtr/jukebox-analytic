@@ -1,33 +1,24 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
+
+const serverAddr = ":8080"
 
 func main() {
 	repo := NewInMemoryRepository()
-
 	handler := NewAnalyticsHandler(repo)
 
-	fmt.Println("--- Simulating API Calls ---")
+	mux := http.NewServeMux()
 
-	handler.HandleLogPlayback(1, 1.25)
-	handler.HandleLogPlayback(1, 1.25)
-	handler.HandleLogPlayback(2, 1.50)
-	handler.HandleLogPlayback(3, 1.00)
-	handler.HandleLogPlayback(1, 1.25)
-	handler.HandleLogPlayback(2, 1.50)
-	handler.HandleLogPlayback(4, 1.00)
-	fmt.Println()
+	mux.HandleFunc("POST /api/v1/logs", handler.HandleLogPlayback)
+	mux.HandleFunc("GET /api/v1/stats/top", handler.HandleGetTopTracks)
+	mux.HandleFunc("PATCH /api/v1/tracks/{id}/price", handler.HandleUpdatePrice)
 
-	topTracks := handler.HandleGetTopTracks()
-	fmt.Println("--- Top 3 Tracks ---")
-	for _, stat := range topTracks {
-		fmt.Printf("- %s: %d plays\n", stat.Title, stat.Count)
+	fmt.Printf("Server starting on http://localhost%s\n", serverAddr)
+	if err := http.ListenAndServe(serverAddr, mux); err != nil {
+		fmt.Printf("Server failed: %v\n", err)
 	}
-	fmt.Println()
-
-	handler.HandleUpdatePrice(1, 0)
-	handler.HandleUpdatePrice(1, 1.35)
-
-	track, _ := repo.GetTrackByID(1)
-	fmt.Printf("\nFinal price for track %d: %.2f\n", track.ID, track.Price)
 }
