@@ -55,7 +55,7 @@ type TopTrackStat struct {
 }
 
 // [GET] /api/v1/stats/top
-func (h *AnalyticsHandler) HandleGetTopTracks() {
+func (h *AnalyticsHandler) HandleGetTopTracks() []TopTrackStat {
 	logs := h.repo.GetAllLogs()
 	counts := make(map[int]int)
 	for _, log := range logs {
@@ -80,8 +80,5 @@ func (h *AnalyticsHandler) HandleGetTopTracks() {
 		top3 = top3[:3]
 	}
 
-	fmt.Println("--- Top 3 Tracks ---")
-	for _, stat := range top3 {
-		fmt.Printf("- %s: %d plays\n", stat.Title, stat.Count)
-	}
+	return top3
 }

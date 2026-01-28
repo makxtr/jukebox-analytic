@@ -18,7 +18,11 @@ func main() {
 	handler.HandleLogPlayback(4, 1.00)
 	fmt.Println()
 
-	handler.HandleGetTopTracks()
+	topTracks := handler.HandleGetTopTracks()
+	fmt.Println("--- Top 3 Tracks ---")
+	for _, stat := range topTracks {
+		fmt.Printf("- %s: %d plays\n", stat.Title, stat.Count)
+	}
 	fmt.Println()
 
 	handler.HandleUpdatePrice(1, 0)
