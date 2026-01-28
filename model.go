@@ -10,7 +10,6 @@ artist: Виконавець.
 price: Поточна вартість (Decimal).
 
 
-
 PlaybackLog (Історія програвань):
 id: Primary Key.
 track: Зв'язок Many-to-One з сутністю Track.
@@ -23,12 +22,21 @@ type Track struct {
 	Title  string
 	Artist string
 	Price  float64
-	Plays  []*PlaybackLog
 }
 
 type PlaybackLog struct {
 	ID         int
-	Track      *Track
+	TrackID    int
 	PlayedAt   time.Time
 	AmountPaid float64
+}
+
+type TrackRepository interface {
+	GetTrackByID(id int) (*Track, error)
+	UpdateTrackPrice(id int, newPrice float64) error
+}
+
+type PlaybackLogRepository interface {
+	CreateLog(log PlaybackLog)
+	GetAllLogs() []PlaybackLog
 }
