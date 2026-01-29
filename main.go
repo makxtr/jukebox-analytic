@@ -15,7 +15,8 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	handler := NewAnalyticsHandler(repo)
+	service := NewService(repo)
+	handler := NewHandler(service)
 
 	mux := http.NewServeMux()
 

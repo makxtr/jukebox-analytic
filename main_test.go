@@ -64,7 +64,8 @@ func TestHandleLogPlayback(t *testing.T) {
 		mockRepo := &mockRepository{
 			tracks: map[int]*Track{1: {ID: 1, Title: "Test Song"}},
 		}
-		handler := NewAnalyticsHandler(mockRepo)
+		service := NewService(mockRepo)
+		handler := NewHandler(service)
 
 		reqBody := []byte(`{"track_id": 1, "amount_paid": 1.25}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/logs", bytes.NewBuffer(reqBody))
@@ -83,7 +84,8 @@ func TestHandleLogPlayback(t *testing.T) {
 
 	t.Run("track not found", func(t *testing.T) {
 		mockRepo := &mockRepository{tracks: map[int]*Track{}}
-		handler := NewAnalyticsHandler(mockRepo)
+		service := NewService(mockRepo)
+		handler := NewHandler(service)
 
 		reqBody := []byte(`{"track_id": 99, "amount_paid": 1.25}`)
 		req := httptest.NewRequest(http.MethodPost, "/api/v1/logs", bytes.NewBuffer(reqBody))
@@ -103,7 +105,8 @@ func TestHandleUpdatePrice(t *testing.T) {
 		mockRepo := &mockRepository{
 			tracks: map[int]*Track{1: {ID: 1, Title: "Test Song", Price: 1.00}},
 		}
-		handler := NewAnalyticsHandler(mockRepo)
+		service := NewService(mockRepo)
+		handler := NewHandler(service)
 
 		reqBody := []byte(`{"new_price": 1.50}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/tracks/1/price", bytes.NewBuffer(reqBody))
@@ -126,7 +129,8 @@ func TestHandleUpdatePrice(t *testing.T) {
 		mockRepo := &mockRepository{
 			tracks: map[int]*Track{1: {ID: 1, Title: "Test Song"}},
 		}
-		handler := NewAnalyticsHandler(mockRepo)
+		service := NewService(mockRepo)
+		handler := NewHandler(service)
 
 		reqBody := []byte(`{"new_price": -5.00}`)
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/tracks/1/price", bytes.NewBuffer(reqBody))
@@ -151,7 +155,8 @@ func TestHandleGetTopTracks(t *testing.T) {
 	mockRepo := &mockRepository{
 		mockTopTracks: expected,
 	}
-	handler := NewAnalyticsHandler(mockRepo)
+	service := NewService(mockRepo)
+	handler := NewHandler(service)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/stats/top", nil)
 	w := httptest.NewRecorder()
