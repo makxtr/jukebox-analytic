@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -33,7 +34,7 @@ func (s *Service) CreateLog(trackID int, amountPaid float64) error {
 	}
 
 	if err := s.repo.CreateLog(log); err != nil {
-		return FailedToCreateLog
+		return fmt.Errorf("%w: %v", FailedToCreateLog, err)
 	}
 
 	return nil
