@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package analytics;
+
+option go_package = "jukebox/analytic/proto";
+
+service AnalyticsService {
+  rpc LogPlayback (LogPlaybackRequest) returns (Empty);
+  rpc GetTopTracks (Empty) returns (TopTracksResponse);
+  rpc UpdatePrice (UpdatePriceRequest) returns (Empty);
+}
+
+message Empty {}
+
+message LogPlaybackRequest {
+  int32 track_id = 1;
+  double amount_paid = 2;
+}
+
+message TopTrack {
+  string title = 1;
+  int32 count = 2;
+}
+
+message TopTracksResponse {
+  repeated TopTrack tracks = 1;
+}
+
+message UpdatePriceRequest {
+  int32 track_id = 1;
+  double new_price = 2;
+}
